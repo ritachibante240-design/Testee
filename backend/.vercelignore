@@ -1,0 +1,10 @@
+.env*
+.venv
+__pycache__
+*.py[cod]
+*.db
+videos.db
+storage
+Dockerfile
+start-container.sh
+run_backend.ps1
