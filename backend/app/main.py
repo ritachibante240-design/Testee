@@ -70,6 +70,7 @@ SUPPORTED_VIDEO_EXTENSIONS = {
     ".webm",
     ".wmv",
 }
+UPLOAD_HEADER_SIZE = 64 * 1024
 logger = logging.getLogger(__name__)
 
 
@@ -277,20 +278,25 @@ def save_video_upload(upload: UploadFile) -> Path:
             ),
         )
 
-    file_path = VIDEO_DIR / f"{uuid4().hex}{extension}"
+    file_path: Path | None = None
     saved = False
 
     try:
-        with file_path.open("wb") as destination:
-            header = upload.file.read(12)
-            if extension == ".mp4" and (
-                len(header) < 8 or header[4:8] != b"ftyp"
-            ):
-                raise HTTPException(
-                    status_code=400,
-                    detail="O conteúdo do arquivo não corresponde ao formato MP4",
-                )
+        header = upload.file.read(UPLOAD_HEADER_SIZE)
+        detected_extension = detect_video_extension(header)
+        if detected_extension:
+            extension = detected_extension
+        elif extension == ".mp4":
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "O arquivo tem extensão .mp4, mas o conteúdo não foi "
+                    "reconhecido como vídeo MP4. Selecione o arquivo original."
+                ),
+            )
 
+        file_path = VIDEO_DIR / f"{uuid4().hex}{extension}"
+        with file_path.open("wb") as destination:
             size = len(header)
             if size > MAX_VIDEO_SIZE:
                 raise HTTPException(
@@ -311,8 +317,44 @@ def save_video_upload(upload: UploadFile) -> Path:
         saved = True
         return file_path
     finally:
-        if not saved:
+        if not saved and file_path is not None:
             file_path.unlink(missing_ok=True)
+
+
+def detect_video_extension(header: bytes) -> str | None:
+    if len(header) >= 12 and header[4:8] == b"ftyp":
+        brand = header[8:12].lower()
+        if brand.startswith(b"3g"):
+            return ".3gp"
+        if brand == b"qt  ":
+            return ".mov"
+        if brand.startswith(b"m4v"):
+            return ".m4v"
+        return ".mp4"
+
+    if header.startswith(b"\x1a\x45\xdf\xa3"):
+        document_type = header[:UPLOAD_HEADER_SIZE].lower()
+        return ".webm" if b"webm" in document_type else ".mkv"
+
+    if header.startswith(b"RIFF") and header[8:12] == b"AVI ":
+        return ".avi"
+    if header.startswith(b"FLV"):
+        return ".flv"
+    if header.startswith(b"\x30\x26\xb2\x75\x8e\x66\xcf\x11"):
+        return ".wmv"
+    if header.startswith(b"OggS"):
+        return ".ogv"
+    if header.startswith(b"\x00\x00\x01\xba"):
+        return ".mpg"
+    if (
+        len(header) >= 377
+        and header[0] == 0x47
+        and header[188] == 0x47
+        and header[376] == 0x47
+    ):
+        return ".ts"
+
+    return None
 
 
 def generate_video_thumbnail(video_path: Path) -> Path:

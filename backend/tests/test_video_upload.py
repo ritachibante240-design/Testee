@@ -27,6 +27,30 @@ class VideoUploadTests(unittest.TestCase):
             finally:
                 path.unlink(missing_ok=True)
 
+    def test_detects_webm_content_even_when_named_mp4(self) -> None:
+        webm_header = (
+            b"\x1a\x45\xdf\xa3\x9f"
+            b"\x42\x86\x81\x01"
+            b"\x42\xf7\x81\x01"
+            b"\x42\xf2\x81\x04"
+            b"\x42\xf3\x81\x08"
+            b"\x42\x82\x84webm"
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            upload = SimpleNamespace(
+                filename="video.mp4",
+                file=io.BytesIO(webm_header + b"video data"),
+            )
+
+            with patch("app.main.VIDEO_DIR", Path(directory)):
+                path = save_video_upload(upload)
+
+            try:
+                self.assertEqual(path.suffix, ".webm")
+                self.assertEqual(path.read_bytes(), webm_header + b"video data")
+            finally:
+                path.unlink(missing_ok=True)
+
     def test_rejects_non_video_file_extension(self) -> None:
         upload = SimpleNamespace(filename="document.pdf", file=io.BytesIO(b"data"))
 
