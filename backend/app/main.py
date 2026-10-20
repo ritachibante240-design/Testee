@@ -46,6 +46,30 @@ FRONTEND_ORIGINS = [
 
 MAX_VIDEO_SIZE = 500 * 1024 * 1024
 UPLOAD_CHUNK_SIZE = 1024 * 1024
+SUPPORTED_VIDEO_EXTENSIONS = {
+    ".3g2",
+    ".3gp",
+    ".asf",
+    ".avi",
+    ".f4v",
+    ".flv",
+    ".m2ts",
+    ".m4v",
+    ".mkv",
+    ".mov",
+    ".mp4",
+    ".mpe",
+    ".mpeg",
+    ".mpg",
+    ".mpv",
+    ".mts",
+    ".mxf",
+    ".ogv",
+    ".ts",
+    ".vob",
+    ".webm",
+    ".wmv",
+}
 logger = logging.getLogger(__name__)
 
 
@@ -244,10 +268,13 @@ def create_video(
 def save_video_upload(upload: UploadFile) -> Path:
     extension = Path(upload.filename or "").suffix.lower()
 
-    if extension != ".mp4":
+    if extension not in SUPPORTED_VIDEO_EXTENSIONS:
         raise HTTPException(
             status_code=415,
-            detail="Envie um vídeo no formato MP4",
+            detail=(
+                "Formato de vídeo não suportado. Envie MP4, MOV, MKV, WebM, "
+                "AVI, WMV, FLV, MPEG, 3GP ou outro formato de vídeo comum."
+            ),
         )
 
     file_path = VIDEO_DIR / f"{uuid4().hex}{extension}"
@@ -256,7 +283,9 @@ def save_video_upload(upload: UploadFile) -> Path:
     try:
         with file_path.open("wb") as destination:
             header = upload.file.read(12)
-            if len(header) < 8 or header[4:8] != b"ftyp":
+            if extension == ".mp4" and (
+                len(header) < 8 or header[4:8] != b"ftyp"
+            ):
                 raise HTTPException(
                     status_code=400,
                     detail="O conteúdo do arquivo não corresponde ao formato MP4",
@@ -416,7 +445,10 @@ def upload_video(
             logger.exception("Não foi possível gerar a miniatura do vídeo enviado.")
             raise HTTPException(
                 status_code=422,
-                detail="Não foi possível gerar a miniatura deste vídeo. Confira se o MP4 pode ser reproduzido.",
+                detail=(
+                    "Não foi possível ler este vídeo. Verifique se o arquivo "
+                    "está íntegro e usa um formato compatível."
+                ),
             ) from error
 
         record = Video(

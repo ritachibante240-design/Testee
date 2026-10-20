@@ -4,7 +4,7 @@ set -eu
 volume_path="${RAILWAY_VOLUME_MOUNT_PATH:-/data}"
 export DATABASE_URL="${DATABASE_URL:-sqlite:///${volume_path}/videos.db}"
 export VIDEOHUB_STORAGE_DIR="${VIDEOHUB_STORAGE_DIR:-${volume_path}/storage}"
-export VIDEOHUB_ALLOW_PUBLIC_UPLOADS="${VIDEOHUB_ALLOW_PUBLIC_UPLOADS:-false}"
+export VIDEOHUB_ALLOW_PUBLIC_UPLOADS="${VIDEOHUB_ALLOW_PUBLIC_UPLOADS:-true}"
 
 mkdir -p \
   "$VIDEOHUB_STORAGE_DIR/videos" \
